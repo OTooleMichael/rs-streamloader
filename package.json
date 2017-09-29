@@ -1,0 +1,27 @@
+{
+  "name": "rs-streamloader",
+  "version": "0.0.1",
+  "description": "Redshift Loading Tool (ETL) - receives readable streams and Copies to Redshift (upsert or insert) via S3",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OTooleMichael/rs-streamloader.git"
+  },
+  "keywords": [
+    "redshift",
+    "etl",
+    "load",
+    "aws",
+    "s3",
+    "stream"
+  ],
+  "author": "Michael O Toole",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/OTooleMichael/rs-streamloader/issues"
+  },
+  "homepage": "https://github.com/OTooleMichael/rs-streamloader#readme"
+}
