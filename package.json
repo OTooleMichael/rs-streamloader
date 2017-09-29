@@ -23,5 +23,17 @@
   "bugs": {
     "url": "https://github.com/OTooleMichael/rs-streamloader/issues"
   },
-  "homepage": "https://github.com/OTooleMichael/rs-streamloader#readme"
+  "homepage": "https://github.com/OTooleMichael/rs-streamloader#readme",
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^3.5.3",
+    "mockery": "^2.1.0",
+    "nock": "^9.0.22",
+    "sinon": "^4.0.0"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.124.0",
+    "pg": "^7.3.0",
+    "uuid": "^3.1.0"
+  }
 }
