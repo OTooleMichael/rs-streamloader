@@ -25,12 +25,12 @@ rl.insert(function(err,res){
 })
 ```
 ## Contents
-- [Installation](#Installation)
-- [Core Methods](#Core-Methods)
-- [Creating options Object](#Creating-options-Object)
-- [Default Options](#Default-Options)
-- [Options Explained](#Options-Explained)
-- [Sample Usage](#Usage)
+- [Installation](#installation)
+- [Core Methods](#core-methods)
+- [Creating options Object](#creating-options-object)
+- [Default Options](#default-options)
+- [Options Explained](#options-explained)
+- [Sample Usage](#sample-usage)
 
 ### N.B
 Elements of the configation take strings as arguments. These strings are used to create plain queries that will be run on Redshift. 
