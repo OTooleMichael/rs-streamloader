@@ -56,7 +56,7 @@ let rl = new RedshiftLoader(options);
 
 ### Creating options Object
 ```javascript
-let options = 		{
+let options = {
 	aws:{ 
 		aws_access_key_id:"ID",
 		aws_secret_access_key:
@@ -107,7 +107,7 @@ defaults.config = {
 		format:'json',
 		truncateCols:true
 	}
-	}
+}
 ```
 Changing the defaults will be helpful in saving time as many elements of the options will always be the same. ```options``` are merged using ```Object.assign``` with the defaults on each instance creatation. Needless to say options passed overrule defaults.
 ```js
@@ -214,8 +214,8 @@ let options = {
     table:{table:"table_name"}
 };
 let rl = new RedshiftLoader(options)
-.insert(function(err,res){
-})
+	.insert(function(err,res){
+	})
 // both will upload to "my_raw_data"."table_name"
 ```
 - ***loadingTable*** *(optional)* : same as ```options.table``` above but set the loading table (for upserts)

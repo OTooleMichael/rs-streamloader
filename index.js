@@ -1,1 +1,1 @@
-module.exports = require('./libs/RedshiftLoader');
+module.exports = require('./lib/RedshiftLoader');
