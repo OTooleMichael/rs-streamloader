@@ -364,6 +364,37 @@ rl.createTable(tableDescription).then(()=>{}).catch(thisError)
 // creates a new one with the listed columns
 // fills it with  "localFile.json"
 ```
+#### Huge Number of Streamed Rows
+```js
+let rs = new Readable();
+rs._read = function(size){};
+
+let uploadParams = {
+	filePrefix:'test/huge_file',
+	table:'huge_table'
+};
+let rl = new RedshiftLoader(uploadParams)
+rl.addFile(rs);
+
+let i = 0;
+new GiantReport() /// huge data that should be split (millions of rows)
+.on('row',function(row){
+	if(i % 100000 == 0 && i > 1){ // every 10k rows we want to split the file so that Redshift can use its clusters effectively
+		rs.push(null); // finish stream
+		rs = new Readable(); // create new stream
+		rs._read = function(size){};
+		rl.addFile(rs); // add the stream to the list of files to upload
+	};
+	i++;
+	rs.push(JSON.stringify( row )+'\n'); // addData to stream & thus to S3;
+})
+.on('end',function(){
+	rs.push(null); // finish final stream
+	rl.insert().then(smthg); // confirm insert
+})
+.stream();
+
+```
 
 
 
