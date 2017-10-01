@@ -88,8 +88,9 @@ let options = {
 	},
 	removeTempTable:true,
     // should the any TEMP RS loading table be removed (false for debugging)
-	s3Cleanup:"SUCESS" 
+	s3Cleanup:"SUCESS",
 	// When should S3 files be deleted on cleanup
+	debug:true // log more for debugging
 };
 let rl = new RedshiftLoader(options);
 rl.upsert().then(doSmthing).catch(thoseErrors)
