@@ -6,23 +6,24 @@ It uses 'aws-sdk'and 'pg' under the hood. rs-streamloaded avoids holding anythin
 It can handle pre-framegmented files which both arrive and need to be uploaded asnycronously. For example a number of report downloads which are provided as seperate files which should all end up in the same Redshift table. rs-streamloader also provides clean up in the form of removing S3 files and temporary table on demand.
 
 ```js
-const RedshiftLoader = require('rs-streamloader');
+const {RedshiftLoader} = require('rs-streamloader');
 const fs = require('fs');
 let options = {
 	aws:{
-		aws_access_key_id:"aws_access_key_id",
-		aws_secret_access_key:"aws_access_key_id"
+		accessKeyId:"aws_access_key_id",
+		secretAccessKey:"aws_access_key_id"
 	},
 	redshiftCreds:MY_RS_CREDENTIALS,
 	bucket:'MY_BUCKET',
 	filePrefix:'upload/pre_',
-	body:fs.createReadStream('./localFile.json'),
+	bodies:[
+		fs.createReadStream('./localFile.json')
+	],
 	table:'raw_data.my_table'
 };
+
 let rl = new RedshiftLoader(options);
-rl.insert(function(err,res){
-    ///...
-})
+await rl.insert()
 ```
 ## Contents
 - [Installation](#installation)
@@ -58,22 +59,25 @@ let rl = new RedshiftLoader(options);
 ```javascript
 let options = {
 	aws:{ 
-		aws_access_key_id:"ID",
-		aws_secret_access_key:
+		accessKeyId:"aws_access_key_id",
+		secretAccessKey:"aws_access_key_id",
+		sessionToken?:'optional session token'
 	},
 	// required for aws-sdk https://www.npmjs.com/package/aws-sdk
 	// can also be provided as envs
 	// http://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-environment.html
 	s3Object:instanceof AWS.S3 // aws-sdk. Pass your own if you wish
-	s3Settings // will be passed to the create S3
+	s3Settings // will be passed to the create S3 new AWS.S3(s3Settings)
 	
 	redshiftCreds:"url_string", 
 	// passed directly to pg.Pool(redshiftCreds) https://www.npmjs.com/package/pg
-	redshiftPool:pgPoolObject // alternative to Credentials passing custom pool getter/pg.Pool
+	redshiftPool:instanceof pg.Pool,// alternative to Credentials passing custom pool getter/pg.Pool
 
 	bucket:'s3://BUCKETREFERENCE',
 	filePrefix:'etlLoadingFolder/files_', // location into which files will be loaded
-	bodies:[ReadableStream], // list of bodies to be uploaded
+	bodies:[
+		ReadableStream | string | instanceof Buffer
+	], // list of bodies to be uploaded
 	body:'{"id":1}', // single body to be uploaded (see below)
 	table:{table:'data_table',schema,'raw_data'}, // or "raw_data.data_table"
 	// table and schema for data to end up in
@@ -82,13 +86,13 @@ let options = {
 	copySettings:{
 	// passed into the building of RS COPY statement
 		timeFormat:'epochmillisecs',
-		format:'json',
+		format:'JSON',
 		truncateCols:true,
 		gzip:true
 	},
 	removeTempTable:true,
     // should the any TEMP RS loading table be removed (false for debugging)
-	s3Cleanup:"SUCESS",
+	s3Cleanup:"SUCESS" | "NEVER" | "ALWAYS",
 	// When should S3 files be deleted on cleanup
 	debug:true // log more for debugging
 };
@@ -110,17 +114,18 @@ defaults.config = {
 	}
 }
 ```
-Changing the defaults will be helpful in saving time as many elements of the options will always be the same. ```options``` are merged using ```Object.assign``` with the defaults on each instance creatation. Needless to say options passed overrule defaults.
+Using the Factory helper will be helpful in saving time as many elements of the options will always be the same.
 ```js
-const RedshiftLoader = require('rs-streamloader');
-let myNewDefaults = {
+const { RedshiftLoaderFactory } = require('rs-streamloader');
+const rsLoaderFactory = new RedshiftLoaderFactory({
     bucket:"MY-S3-BUCKET",
     aws:MY_AWS_CONFIGS,
     redshiftPool:MY_ONE_RS_POOL,
     filePrefix:'folder/where-i-put-everything',
     loadingTable:{schema:"my_loading_schema_in_redshift"},
     table:{schema:"my_raw_data_schema_in_rs"}
-};
+})
+
 RedshiftLoader.defaults.config = Object.assign(RedshiftLoader.defaults.config, myNewDefaults);
 // we could even reexport this as a module , set up once and share among the project
 module.exports = RedshiftLoader;
@@ -129,7 +134,8 @@ let tinyOpts = {
     table:'table_to_load_to', // goes to "my_raw_data_schema_in_rs"."table_to_load_to" in RS
     body:FILE_IN_QUESTION
 }
-let rl = new RedshiftLoader(tinyOpts).insert().then(doSmthg).catch(anyErrors)
+let rl = rsLoaderFactory.createLoader(tinyOpts) // instaceof RedshiftLoader
+rl.insert().then(doSmthg).catch(anyErrors)
 ```
 If you have as extreme an example as above consider inititalizing the defaults in a dedicated module
 
@@ -146,7 +152,7 @@ AWS.config.loadFromPath('./config.json'); // my own way of auth
 // http://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-json-file.html
 let myS3Instance = new AWS.S3(CUSTOM_CONFIG);
 let options = {
-    .....
+    ...,
     S3Object:myS3Instance
 };
 let rl = new RedshiftLoader(options);
@@ -168,27 +174,28 @@ pg.defaults.poolIdleTimeout = 600000; // I want to change my defaults
 let CREDS = JSON.parse(process.env.REDSHIFT_DETAILS); 
 const myOnePool = new pg.Pool(CREDS);
 
-RedshiftLoader.defaults.config.redshiftPool = myOnePool; 
 // no need to keep passing the pool in  options. now Redshift loader uses our central pool by default
-let rl = new RedshiftLoader(options);
+let rl = new RedshiftLoader({...options,rsPool:myOnePool});
 ```
 ###### Custom clientGetter Function via ```options.redshiftPool```
 If you want to implment Redshift connection some other way with other custom logic or another module than ```pg``` you can do that too. It just needs to have these elements
 ```js
-let rsClientGetter = function(getClientCb){
-    function releaseClientToPool(error){ // not required if you dont need the client released
-        // custom release client logic
-	};
-	let clientObject = {
-	    // client Object requires a query menthod thats all.
-		query:function(queryString,resultCb){
-		    // result can be an Array of rows or nad Object containing an array of Rows { rows:[] }
-		    return resultCb(err,result)
+const myPool = {
+	connect:function(fn){
+		let error = null
+		let client = {
+			query:function(sqlQuery){
+				return Promise.resolve({ rows:[] })
+			}
 		}
-	};
-	getClientCb( errorGettingClient , clientObject, releaseClientToPool)
-}
-    
+		let releaseClient = function(err){
+			if(err){
+				// ...do something
+			}
+		}
+		fn(err, client, releaseClient))
+	}
+}  
 ```
 - ***redshiftCreds*** : If you arent worried about how the RS connection happens then just pass login credentials. it will go direct to ```pg module``` as found [here](https://node-postgres.com/features/connecting). 
 ```js
@@ -214,9 +221,7 @@ let options = {
     // or
     table:{table:"table_name"}
 };
-let rl = new RedshiftLoader(options)
-	.insert(function(err,res){
-	})
+let rl = await new RedshiftLoader(options).insert()
 // both will upload to "my_raw_data"."table_name"
 ```
 - ***loadingTable*** *(optional)* : same as ```options.table``` above but set the loading table (for upserts)
@@ -238,7 +243,7 @@ If there are more settings for the copy query desired just ask me or better yet 
 
 #### Simple file to table
 ```js
-const RedshiftLoader = require('rs-streamloader');
+const { RedshiftLoader } = require('rs-streamloader');
 const fs = require('fs');
 let options = {
 	aws:AWS_CREDS,
@@ -249,9 +254,7 @@ let options = {
 };
 let rl = new RedshiftLoader(options);
 rl.addFile( fs.createReadStream('./localFile.json') )
-rl.insert(function(err,res){
-    ///...
-})
+await rl.insert()
 ```
 
 #### Asyncronously Add Files
@@ -262,9 +265,9 @@ let options = {
 let rl = new RedshiftLoader(options);
 rl.addFile( fs.createReadStream('./localFile.json') )
 setTimeout(function(){
-     rl.addFile( fs.createReadStream('./anotherFile.json') )
+    rl.addFile( fs.createReadStream('./anotherFile.json') ) // uploads begin immediately
      /// call rl.insert only after all files have been added
-     rl.upsert().then(function(res){
+    rl.upsert().then(function(res){
         ///...
     }).catch(function(err){
         ///....
@@ -341,30 +344,6 @@ let rl = new RedshiftLoader(options)
 	//..
 })
 ```
-#### Create and Fill a table
-```js
-let options = {
-    table:"raw_data.new_table",
-    body:fs.createReadStream('./localFile.json')
-    //...
-}
-let rl = new RedshiftLoader(options)
-let tableDescription = {
-    overwrite:true, // drop any existing table 
-    additionalText:'distkey(id) sortkey(id,)', // SQL INJECTION BE CAREFUL. is just stuck to the end
-    columns: [ // Strings are simple built into a create statment and not sense checked at the moment
-        {name:"id", type:"INT"}, // BOTH SQL INJECTION BE CAREFUL
-        {name:"text", type:"varchar"},
-        {name:"more_text"}, // defaults to type varchar
-        "even_more_text",  // defaults to type varchar
-        {name:"created_at", type:"TIMESTAMP"}
-    ]
-};
-rl.createTable(tableDescription).then(()=>{}).catch(thisError)
-// drops any table called raw_data.new_table
-// creates a new one with the listed columns
-// fills it with  "localFile.json"
-```
 #### Huge Number of Streamed Rows
 ```js
 let rs = new Readable();
@@ -383,7 +362,7 @@ new GiantReport() /// huge data that should be split (millions of rows)
 	if(i % 100000 == 0 && i > 1){ // every 10k rows we want to split the file so that Redshift can use its clusters effectively
 		rs.push(null); // finish stream
 		rs = new Readable(); // create new stream
-		rs._read = function(size){};
+		rs._read = function(size){}; // this isn't good practice in the real world as we can't control the flow of data from source to upload
 		rl.addFile(rs); // add the stream to the list of files to upload
 	};
 	i++;
