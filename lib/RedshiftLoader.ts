@@ -38,10 +38,8 @@ export default class RedshiftLoader extends EventEmitter {
   uploadType?: UploadType;
   constructor(options: RSLoaderOptions) {
     super();
-    assert(options, 'Options Required');
-    // inits
-
-    this.defaults = mergeOptions(options, createDefaults()) as FactoryOptions;
+    assert(options, 'Options Required')
+    this.defaults = mergeOptions(options) // ensure all defaults exist
     this.s3Cleanup =
       this.defaults.s3Cleanup === true
         ? 'SUCCESS'

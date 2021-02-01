@@ -62,7 +62,8 @@ export interface FactoryOptions {
   copySettings: CopySettings;
   debug?: boolean;
 }
-export interface RSLoaderOptions extends Partial<FactoryOptions> {
+export type DefaultOptionInputs = Omit<Partial<FactoryOptions>,'copySettings'> & {copySettings?:Partial<CopySettings>};
+export interface RSLoaderOptions extends DefaultOptionInputs {
   table: TableName;
   bodies?: UploadBody[];
   body?: UploadBody;

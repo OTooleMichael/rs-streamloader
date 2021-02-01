@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { AWSCredentials, CopySettings, FactoryOptions, RSLoaderOptions, TableName } from './types';
+import { AWSCredentials, CopySettings, DefaultOptionInputs, FactoryOptions, RSLoaderOptions, TableName } from './types';
 interface LoaderErrorDetails {
   query?: string;
   step?: number;
@@ -44,20 +44,21 @@ export function createDefaults(): FactoryOptions {
   };
 }
 
-export function mergeOptions(
-  options: Partial<FactoryOptions>,
-  defaultOptions: FactoryOptions,
-): FactoryOptions | RSLoaderOptions {
+export function mergeOptions<T extends FactoryOptions | RSLoaderOptions = FactoryOptions>(
+  options: DefaultOptionInputs,
+  defaultOptions: DefaultOptionInputs = {},
+): T {
   const copySettings = options.copySettings as Partial<CopySettings> | undefined;
+  const defaultCopySettings = defaultOptions.copySettings as Partial<CopySettings> | undefined;
   delete options.copySettings;
-  const output = {
+  const output: T = {
     ...createDefaults(),
     ...defaultOptions,
-    ...options,
-  };
+    ...options
+  } as T
   if (copySettings) {
     output.copySettings = {
-      ...(defaultOptions.copySettings||{}),
+      ...defaultCopySettings,
       ...copySettings,
     } as CopySettings;
   }
