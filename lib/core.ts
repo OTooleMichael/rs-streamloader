@@ -76,7 +76,7 @@ async function queryClient(client: ClientLike, sql: string): Promise<Rows> {
 }
 async function getClientFromPool(pool: PoolLike): Promise<[ClientLike, ReleaseFn]> {
   return new Promise((resolve, reject) => {
-    pool.connect((err, client, done=function(error?:any){}) => {
+    pool.connect((err, client, done=function(error?:any){return undefined}) => {
 	  if(err) return reject(err);
 	  if(!client) return reject(new Error('NO_CLIENT'))
       assert(typeof client.query === 'function', 'Client Object from Pool must have a query fn');
