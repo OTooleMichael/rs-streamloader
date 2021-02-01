@@ -58,3 +58,4 @@ typings/
 .env
 config.js
 .DS_Store
+dist/
