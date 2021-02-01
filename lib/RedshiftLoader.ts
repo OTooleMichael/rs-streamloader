@@ -385,7 +385,7 @@ function createFormat(copySettings: CopySettings) {
   if (copySettings.format !== 'JSON') {
     return copySettings.format;
   }
-  return `JSON ${copySettings.columnMap}`;
+  return `JSON '${copySettings.columnMap||'auto'}'`;
 }
 
 // RedshiftLoader.prototype.createTable = function(tableParams,cb)

@@ -48,21 +48,21 @@ export function mergeOptions<T extends FactoryOptions | RSLoaderOptions = Factor
   options: DefaultOptionInputs,
   defaultOptions: DefaultOptionInputs = {},
 ): T {
-  const copySettings = options.copySettings as Partial<CopySettings> | undefined;
-  const defaultCopySettings = defaultOptions.copySettings as Partial<CopySettings> | undefined;
-  delete options.copySettings;
-  const output: T = {
+    const copySettings = options.copySettings || {} as Partial<CopySettings>;
+    const defaultCopySettings = defaultOptions.copySettings || {} as Partial<CopySettings>;
+    delete options.copySettings;
+    const output: T = {
     ...createDefaults(),
     ...defaultOptions,
     ...options
-  } as T
-  if (copySettings) {
+    } as T
+
     output.copySettings = {
-      ...defaultCopySettings,
-      ...copySettings,
+        ...createDefaults().copySettings,
+        ...defaultCopySettings,
+        ...copySettings,
     } as CopySettings;
-  }
-  return output;
+    return output;
 }
 export function parseRsTables(tableParams: TableName): { table: string; schema: string } {
   if (typeof tableParams === 'string') {
