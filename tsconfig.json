@@ -1,0 +1,33 @@
+{
+    "compilerOptions": {
+      "target": "es2017",
+      "lib": [
+        "esnext"
+      ],
+      "allowJs": true,
+      "skipLibCheck": true,
+      "esModuleInterop": true,
+      "allowSyntheticDefaultImports": true,
+      "strict": true,
+      "forceConsistentCasingInFileNames": true,
+      "module": "commonjs",
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "isolatedModules": false,
+      "noEmit": false,
+      "typeRoots": ["./node_modules/@types", "./typings"],
+      "outDir": "dist",
+      "declaration":true
+    },
+    "include":[
+      "lib/**/*",
+      "app.ts"
+    ],
+    "exclude": [
+      "lib/**/*.spec.*",
+      "node_modules",
+      "node_modules/**/*",
+      "dist"
+    ]
+  }
+  
