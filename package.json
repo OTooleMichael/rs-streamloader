@@ -6,17 +6,19 @@
   "types": "dist/index.d.ts",
   "author": "Michael O Toole",
   "license": "MIT",
-  "files": ["dist/**/*"],
+  "files": [
+    "dist/**/*"
+  ],
   "scripts": {
     "format": "prettier --write \"lib/**/*.ts\" \"lib/**/*.js\"",
     "lint": "tslint -p tsconfig.json",
     "test": "jest --config jestconfig.json",
     "build": "rm -rf dist && mkdir dist && tsc --build tsconfig.json",
-    "prepare" : "npm run build",
-    "prepublishOnly" : "npm test && npm run lint",
-    "preversion" : "npm run lint",
-    "version" : "npm run format && git add -A lib",
-    "postversion" : "git push && git push --tags"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run lint",
+    "preversion": "npm run lint",
+    "version": "npm run format && git add -A lib",
+    "postversion": "git push && git push --tags"
   },
   "repository": {
     "type": "git",
@@ -28,7 +30,12 @@
     "singleQuote": true
   },
   "keywords": [
-    "redshift", "etl",  "load", "aws",  "s3",  "stream"
+    "redshift",
+    "etl",
+    "load",
+    "aws",
+    "s3",
+    "stream"
   ],
   "bugs": {
     "url": "https://github.com/OTooleMichael/rs-streamloader/issues"
@@ -39,7 +46,6 @@
     "@types/luxon": "^1.25.1",
     "@types/pg": "^7.14.9",
     "@types/uuid": "^8.3.0",
-    "chai": "^4.1.2",
     "jest": "^26.6.3",
     "nock": "^13.0.7",
     "prettier": "^2.2.1",
