@@ -3,15 +3,27 @@ import AWS from 'aws-sdk'
 import RedshiftLoader from './RedshiftLoader'
 import { createDefaults } from './utils';
 import { ClientLike, PoolLike, QueryResLike, ReleaseFn, RSLoaderOptions } from './types';
+type MiniS3 = Partial<AWS.S3> & {
+  upload:jest.MockedFunction<AWS.S3['upload']>;
+  deleteObjects:jest.MockedFunction<AWS.S3['deleteObjects']>;
+}
+type MiniS3Upload = Partial<AWS.S3.ManagedUpload> & {
+  promise:jest.MockedFunction<AWS.S3.ManagedUpload['promise']>
+}
+type QueryFn = (sql:string)=>Promise<QueryResLike>;
 var mS3Instance: MiniS3;
 var managedUpload: MiniS3Upload;
 managedUpload =  {
-  send:jest.fn(),
+  promise:jest.fn().mockResolvedValue({} as AWS.S3.ManagedUpload.SendData),
   abort:jest.fn()
 }
 mS3Instance = {
   upload: jest.fn().mockReturnValue(managedUpload),
-  deleteObjects:jest.fn()
+  deleteObjects:jest.fn(function(params: AWS.S3.DeleteObjectsRequest){
+    return {
+      promise:jest.fn().mockResolvedValue({} as AWS.S3.DeleteObjectsOutput)
+    } as unknown as AWS.Request<AWS.S3.DeleteObjectsOutput, AWS.AWSError>
+  }) as unknown as jest.MockedFunction<AWS.S3['deleteObjects']>
 };
 jest.mock('aws-sdk', () => {
   return { S3: jest.fn(() => mS3Instance) };
@@ -44,14 +56,7 @@ const TEST_ROWS = [
   r.id = i + 1;
   return r;
 });
-type MiniS3 = Partial<AWS.S3> & {
-  upload:jest.MockedFunction<AWS.S3['upload']>;
-  deleteObjects:jest.MockedFunction<AWS.S3['deleteObjects']>;
-}
-type MiniS3Upload = Partial<AWS.S3.ManagedUpload> & {
-  send:jest.MockedFunction<AWS.S3.ManagedUpload['send']>
-}
-type QueryFn = (sql:string)=>Promise<QueryResLike>;
+
 describe('Redshift Loader ', function () {
   var options: RSLoaderOptions ;
   var query = jest.fn() as jest.MockedFunction<QueryFn>;
@@ -72,8 +77,12 @@ describe('Redshift Loader ', function () {
   });
   beforeEach(function (){
     mS3Instance.upload = jest.fn().mockReturnValue(managedUpload)
-    mS3Instance.deleteObjects = jest.fn()
-    managedUpload.send = jest.fn()
+    mS3Instance.deleteObjects = jest.fn(function(params: AWS.S3.DeleteObjectsRequest){
+      return {
+        promise:jest.fn().mockResolvedValue({} as AWS.S3.DeleteObjectsOutput)
+      } as unknown as AWS.Request<AWS.S3.DeleteObjectsOutput, AWS.AWSError>
+    }) as unknown as jest.MockedFunction<AWS.S3['deleteObjects']>
+    managedUpload.promise = jest.fn().mockResolvedValue({} as AWS.S3.ManagedUpload.SendData)
     query = jest.fn() as jest.MockedFunction<QueryFn>
     query.mockResolvedValue({rows:[]})
     releaseClient = jest.fn()
@@ -96,39 +105,47 @@ describe('Redshift Loader ', function () {
       ]
     }
   })
-  it('Inserts Bodies And Deletes', async function (done) {
+  it('Inserts Bodies And Deletes', async function(done){
     let ld = new RedshiftLoader(options);
     let uploadManifest = jest.spyOn(ld, 'uploadManifest');
     await ld.insert();
     expect(uploadManifest).toHaveBeenCalledTimes(1);
     expect(mS3Instance.upload.mock.calls.length).toEqual(3);
+    return done()
   });
-  it('Debugging Throws no errors', async function (){
+  it('Debugging Throws no errors', async function (done){
     options = {
       ...options, debug:true
     }
+    let log = console.log
+    console.log = jest.fn()
     let ld = new RedshiftLoader(options);
-    jest.spyOn(ld, 'debug');
+    ld.debug = jest.fn()
     await ld.insert()
-    expect(managedUpload.send.mock.calls.length).toEqual(2);
+    expect(managedUpload.promise.mock.calls.length).toEqual(3);
     expect(mS3Instance.deleteObjects.mock.calls.length).toEqual(1);
+    console.log = log
+    return done()
   });
-  it('s3Cleanup Called Once on SUCCESS', async function (){
+  it('s3Cleanup Called Once on SUCCESS', async function(done){
     await new RedshiftLoader(options).insert()
     expect(mS3Instance.deleteObjects.mock.calls.length).toEqual(1);
+    return done()
   });
-  it('NEVER calls s3Cleanup', async function () {
+  it('NEVER calls s3Cleanup', async function(done){
     options.s3Cleanup = 'NEVER';
     await new RedshiftLoader(options).insert()
-    expect(managedUpload.send.mock.calls.length).toEqual(2);
+    expect(managedUpload.promise.mock.calls.length).toEqual(3);
     expect(mS3Instance.deleteObjects.mock.calls.length).toEqual(0);
+    return done()
   });
-  it('Add File Increases uploads', async function (){
+  it('Add File Increases uploads', async function(done){
     options.s3Cleanup = 'NEVER';
     let rl = new RedshiftLoader(options);
     rl.addFile('');
     await rl.insert()
-    expect(managedUpload.send.mock.calls.length).toEqual(2);
+    expect(managedUpload.promise.mock.calls.length).toEqual(4);
+    return done()
   });
   it('Gets Quailified Tables', function () {
     options.table =  { table: 'rs_loader', schema: 'schema1' }
@@ -146,12 +163,12 @@ describe('Redshift Loader ', function () {
     options = {
       ...options,
       table: 'schema1.rs_loader',
-      loadingTable: { table: 'rs_loader_temp', schema: 'loading' },
+      loadingTable: { table: 'rs_loader_temp', schema: 'loader' },
     }
     ld = new RedshiftLoader(options);
-    expect(ld.getQualifiedTable('loadingTable')).toEqual('loader.rs_loader');
+    expect(ld.getQualifiedTable('loadingTable')).toEqual('loader.rs_loader_temp');
   });
-  it('Gets Quailified Tables only accepts certain params', function () {
+  it('Gets Quailified Tables only accepts certain params', function(){
     options = {
       ...options,
       table: { table: 'rs_loader', schema: 'schema1' },

@@ -54,14 +54,14 @@ export default class RedshiftLoader extends EventEmitter {
     this._started = false;
     this.jobTime = createRunTime();
     this.table = parseRsTables(options.table);
-    this.loadingTable = parseRsTables(options.loadingTable || options.table);
+    this.loadingTable = parseRsTables(options.loadingTable || options.table)
     if (!this.loadingTable.table) {
       this.loadingTable.table = this.table.table;
     }
     if (!this.loadingTable.schema) {
       this.loadingTable.schema = this.table.schema;
     }
-    const tempBodies = options.body ? [options.body] : options.bodies || []; //
+    const tempBodies = (options.body ? [options.body] : options.bodies) || []
     const bucket = options.bucket || this.defaults.bucket;
     assert(bucket, 'Options.bucket Required');
     this.bucket = bucket;
@@ -98,11 +98,14 @@ export default class RedshiftLoader extends EventEmitter {
     }
     if (this.defaults.redshiftPool) {
       this.rsPool = this.defaults.redshiftPool;
-      return this;
+    }else{
+      pg.defaults.poolIdleTimeout = 600000;
+      if(!this.defaults.redshiftCreds){
+        throw new Error('Pool or Redshift Creds must be provided')
+      }
+      this.rsPool = new pg.Pool(this.defaults.redshiftCreds);
+      this.debug('Reshift Pool Created');
     }
-    pg.defaults.poolIdleTimeout = 600000;
-    this.rsPool = new pg.Pool(this.defaults.redshiftCreds);
-    this.debug('Reshift Pool Created');
     assert(tempBodies instanceof Array, 'options.bodies must be an Array');
     this.addFiles(tempBodies);
   }
@@ -117,7 +120,7 @@ export default class RedshiftLoader extends EventEmitter {
     }
     return filePrefix;
   }
-  addFile(uploadBody: UploadBody) {
+  addFile(uploadBody: UploadBody){
     // http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3/ManagedUpload.html
     if (this._started) {
       const e = new Error('RS_LOAD_STARTED:  Cannot add more files after RS load has started');
@@ -135,7 +138,6 @@ export default class RedshiftLoader extends EventEmitter {
       Body: uploadBody,
       Bucket: bucket,
     });
-    console.log(managedUpload,this.S3.upload )
     const task: UploadTask = {
       body: uploadBody,
       key,
@@ -145,38 +147,38 @@ export default class RedshiftLoader extends EventEmitter {
       uploaded: false,
     };
     this.uploadTasks.push(task);
-
-    const uploadPromise = new Promise<UploadTask>((resolve, reject) => {
-      this.debug('S3 Upload started. Task : ', task);
-      task.managedUpload.send((err, res) => {
-        if (!err) {
-          task.uploaded = true;
-          this.debug('FILE UPLOADED', task);
-          resolve(task);
-        } else {
-          task.error = err;
-          const e = new LoaderError('UPLOAD_FAILED', {
-            details: err,
-          });
-          this.debug('UPLOAD_FAILED', task, err);
-          this.emit('error', e);
-          // safely cancel uploads
-          this._wrapUp(e);
-          reject(task);
-        }
-        this.emit('progress', {
-          task: 'uploadedFile',
-          error: err,
-          res: task,
-          data: res,
-        });
+    this.debug('S3 Upload started. Task : ', task);
+    const uploadPromise = task.managedUpload.promise().then((res)=>{
+      task.uploaded = true;
+      this.debug('FILE UPLOADED', task);
+      this.emit('progress', {
+        task: 'uploadedFile',
+        res: task,
+        data: res,
       });
-    });
+      return task
+    }).catch(err=>{
+      task.error = err;
+      const e = new LoaderError('UPLOAD_FAILED', {
+        details: err,
+      });
+      this.debug('UPLOAD_FAILED', task, err);
+      this.emit('error', e);
+      // safely cancel uploads
+      this._wrapUp(e);
+      this.emit('progress', {
+        task: 'uploadedFile',
+        error: err,
+        res: task,
+        data: undefined,
+      });
+      return Promise.reject(e)
+    })
     this.uploadPromises.push(uploadPromise);
     return task;
   }
   addFiles(uploadBodies: UploadBody[]) {
-    assert(uploadBodies instanceof Array, 'File Bodies must be an array of bodies');
+    assert(uploadBodies instanceof Array, 'File Bodies must be an array of bodies')
     return uploadBodies.map((b) => this.addFile(b));
   }
   _wrapUp(error?: Error) {
@@ -205,7 +207,7 @@ export default class RedshiftLoader extends EventEmitter {
     this.cleanUpS3();
     return this;
   }
-  cleanUpS3(): Promise<'NOTHING_TO_DELETE' | AWS.S3.DeleteObjectsOutput> {
+  async cleanUpS3(): Promise<'NOTHING_TO_DELETE' | AWS.S3.DeleteObjectsOutput> {
     const Objects = this.uploadTasks
       .filter((task) => task.uploaded)
       .map(function (task) {
@@ -223,18 +225,21 @@ export default class RedshiftLoader extends EventEmitter {
       Bucket: this.bucket,
       Delete: { Objects },
     };
-    return new Promise((resolve, reject) => {
-      this.S3.deleteObjects(params, (err, data) => {
-        this.emit('progress', {
-          task: 'deleteObjects',
-          error: err,
-          data,
-        });
-        this.debug('CLEAN UP RESPONSES', err, data);
-        if (err) return reject(err);
-        return resolve(data);
+    try{
+      const data = await this.S3.deleteObjects(params).promise()
+      this.emit('progress', {
+        task: 'deleteObjects',
+        data,
       });
-    });
+      this.debug('CLEAN UP RESPONSES', data)
+      return data;
+    }catch(err){
+      this.emit('progress', {
+        task: 'deleteObjects',
+        error: err,
+      });
+      throw err
+    }
   }
   getQualifiedTable(tableType = 'table') {
     if (tableType === 'table'){
@@ -254,13 +259,12 @@ export default class RedshiftLoader extends EventEmitter {
   upsert() {
     return this._start(UploadType.UPSERT);
   }
-  async _start(uploadType: UploadType) {
-    console.log(this)
+  async _start(uploadType: UploadType){
     assert(this.uploadTasks.length > 0, 'Some Files must be added first');
     this.uploadType = uploadType;
     this._started = true;
     try {
-      const tasks: UploadTask[] = await Promise.all(this.uploadPromises);
+      this.uploadTasks = await Promise.all(this.uploadPromises) as UploadTask[]
       await this.uploadManifest();
       const { q, cleanUp } = this.makeQueries();
       await transactionQuery(this.rsPool, q, cleanUp);
@@ -278,7 +282,7 @@ export default class RedshiftLoader extends EventEmitter {
       throw err;
     }
   }
-  uploadManifest() {
+  async uploadManifest() {
     const { bucket } = this;
     const filePrefix = this.getFilePrefix();
     const manifest = {
@@ -292,28 +296,29 @@ export default class RedshiftLoader extends EventEmitter {
     const manifestKey = `${filePrefix}_${this.jobTime}_manifiest_${v4().replace(/-/g, '')}.json`;
     this.manifestKey = manifestKey;
     this.debug('MANIFEST S3 UPLOAD STARTED', manifestKey, manifest);
-
-    return new Promise((resolve, reject) => {
-      this.S3.upload({
+    try{
+      const upload = this.S3.upload({
         Key: manifestKey,
         Body: JSON.stringify(manifest, null, 2),
         Bucket: bucket,
-      }).send((err, res) => {
-        this.emit('progress', {
-          task: 'uploadedManifest',
-          error: err,
-          data: res,
-        });
-        if (!err) {
-          this.debug('MANIFEST UPLOADED', res);
-          return resolve(res);
-        }
-        const e = new LoaderError('MANIFOLD_UPLOAD_FAILED', { details: err });
-        this.debug('MANIFEST UPLOAD FAILED', manifestKey, e);
-        this.emit('error', e);
-        return reject(e);
+      })
+      const res = await upload.promise()
+      this.debug('MANIFEST UPLOADED', res);
+      this.emit('progress', {
+        task: 'uploadedManifest',
+        error: undefined,
+        data: res,
       });
-    });
+      return res
+    }catch(err){
+      const e = new LoaderError('MANIFOLD_UPLOAD_FAILED', { details: err });
+      this.debug('MANIFEST UPLOAD FAILED', manifestKey, e);
+      this.emit('error', e);
+      this.emit('progress', {
+        task: 'uploadedManifest',
+        error: err
+      });
+    }
   }
   makeQueries(): { q: string[]; cleanUp?: string } {
     const { copySettings, idField, removeTempTable } = this.defaults;
