@@ -19,6 +19,18 @@ interface UploadTask {
   uploaded: boolean;
   error?: Error;
 }
+function isS3Like(s3: AWS.S3): boolean{
+  if(!s3){
+    return false
+  }
+  if(typeof s3.upload !== 'function'){
+    return false
+  }
+  if(typeof s3.deleteObjects !== 'function'){
+    return false
+  }
+  return true
+}
 export default class RedshiftLoader extends EventEmitter {
   defaults: FactoryOptions;
   uploadTasks: UploadTask[];
@@ -78,7 +90,7 @@ export default class RedshiftLoader extends EventEmitter {
     this.AWS_CREDS = createCopyCredString(aws);
     const { s3Object, s3Settings } = options;
     if (s3Object) {
-      assert(s3Object instanceof AWS.S3, 's3Object must be of type AWS.S3');
+      assert(isS3Like(s3Object), 's3Object must be of type AWS.S3');
       this.S3 = s3Object; // provide your own
     } else {
       const credentials = (s3Settings?.credentials || isAWSEnvVars
