@@ -52,11 +52,12 @@ export function mergeOptions(
   delete options.copySettings;
   const output = {
     ...createDefaults(),
+    ...defaultOptions,
     ...options,
   };
   if (copySettings) {
     output.copySettings = {
-      ...defaultOptions.copySettings,
+      ...(defaultOptions.copySettings||{}),
       ...copySettings,
     } as CopySettings;
   }
