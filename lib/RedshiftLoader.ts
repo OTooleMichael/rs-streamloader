@@ -5,7 +5,11 @@ import { v4 } from 'uuid';
 import AWS from 'aws-sdk';
 import pg from 'pg';
 import { transactionQuery } from './core';
-import { createDefaults, mergeOptions, parseRsTables, createCopyCredString, LoaderError } from './utils';
+import { 
+  ensureS3BodyAcceptable,
+  mergeOptions, parseRsTables, createCopyCredString,
+  LoaderError
+} from './utils';
 import { CopySettings, FactoryOptions, PoolLike, RSLoaderOptions, UploadBody, UploadType } from './types';
 function createRunTime(format: string = 'yyyyLLdd_HHmmss'): string {
   return DateTime.utc().toFormat(format);
@@ -31,6 +35,7 @@ function isS3Like(s3: AWS.S3): boolean{
   }
   return true
 }
+
 export default class RedshiftLoader extends EventEmitter {
   defaults: FactoryOptions;
   uploadTasks: UploadTask[];
@@ -116,6 +121,7 @@ export default class RedshiftLoader extends EventEmitter {
       this.rsPool = new pg.Pool(this.defaults.redshiftCreds);
       this.debug('Reshift Pool Created');
     }
+    assert(this.defaults.filePrefix, 'filePrefix is a required option')
     assert(tempBodies instanceof Array, 'options.bodies must be an Array');
     this.addFiles(tempBodies);
   }
@@ -138,14 +144,13 @@ export default class RedshiftLoader extends EventEmitter {
       console.warn(e.stack);
       return;
     }
-
     const { bucket } = this;
     const i = this.uploadTasks.length;
     const filePrefix = this.getFilePrefix();
     const key = `${filePrefix}${this.jobTime}_prt_${i}_${v4().replace(/-/g, '')}.txt`;
     const managedUpload = this.S3.upload({
       Key: key,
-      Body: uploadBody,
+      Body: ensureS3BodyAcceptable(uploadBody),
       Bucket: bucket,
     });
     const task: UploadTask = {
@@ -387,32 +392,3 @@ function createFormat(copySettings: CopySettings) {
   }
   return `JSON '${copySettings.columnMap||'auto'}'`;
 }
-
-// RedshiftLoader.prototype.createTable = function(tableParams,cb)
-// {
-// 	assert(tableParams && tableParams.columns,'params and columns required');
-// 	if(typeof cb === 'function')
-// 	{
-// 		promiseToCb(this.createTable(tableParams),cb)
-// 		return this
-// 	}
-// 	console.warn('Cols and types must be correct for Redshift. No validity Check is performed')
-//     const TABLE = this.getQualifiedTable('table');
-//     let OVERWRITE = (tableParams.overwrite) ? `DROP TABLE IF EXISTS ${TABLE};` : '';
-//     let fieldsList = tableParams.columns.map(function(c){
-//     	return (typeof c == "string") ? c+' varchar' : `${c.name} ${c.type || 'varchar'}`;
-//     }).join(',');
-//     let query = `
-//     	${OVERWRITE}
-//     	CREATE TABLE ${TABLE}
-//     	(${fieldsList})
-//     	${(tableParams.additionalText) ? tableParams.additionalText : ''}
-//     	;
-//     `;
-//     this.debug('CREATATION STATEMENT PRODUCED IS :\n',query);
-// 	let Q = transactionQuery(this.rsPool, [query])
-// 	if(this.bodies.length > 0){
-// 		Q = Q.then(()=>this.insert());
-// 	};
-// 	return Q;
-// }

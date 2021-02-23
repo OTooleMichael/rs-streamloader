@@ -1,10 +1,72 @@
 import assert from 'assert';
-import { AWSCredentials, CopySettings, DefaultOptionInputs, FactoryOptions, RSLoaderOptions, TableName } from './types';
+import {Stream, Readable, Transform} from 'stream'
+import { 
+  S3UploadBody,
+  UploadBody, AWSCredentials, CopySettings,
+  DefaultOptionInputs, FactoryOptions, RSLoaderOptions,
+  TableName
+} from './types';
 interface LoaderErrorDetails {
   query?: string;
   step?: number;
   retries?: number;
   details?: any;
+}
+type RowObject = Record<string, any>;
+export function isObjectStream(obj: Readable | Stream | any): boolean{
+  if(!(obj instanceof Stream)){
+    return false
+  }
+  //@ts-ignore
+  return typeof obj._read === 'function' && obj.readableObjectMode
+}
+function toJSONLine(obj: RowObject){
+  return Buffer.from(JSON.stringify(obj) + '\n', 'utf-8')
+}
+export function toNewLineJSON(stream: Readable){
+  const tx = new Transform({
+    writableObjectMode:true,
+    readableObjectMode:false,
+    transform(obj: RowObject, encoding, callback) {
+      return callback(null, toJSONLine(obj))
+    }
+  });
+  return stream.pipe(tx)
+}
+export function generatorToReadable<T extends RowObject = RowObject>(
+  generator: AsyncGenerator<T>,
+): Readable {
+  const stream = new Readable({
+    objectMode:false,
+    async read(){
+      (async () => {
+        for await (let row of generator){
+          const value = toJSONLine(row)
+          if (!this.push(value)){
+            await new Promise((resolve) => stream.once("drain", resolve))
+          }
+        }
+        this.push(null)
+      })().catch(e=>{
+        console.log(e,'ERROR')
+        stream.emit('error', e)
+      });
+    }
+  })
+  return stream;
+}
+export function ensureS3BodyAcceptable(obj: UploadBody): S3UploadBody {
+  if(typeof obj === 'string' || obj instanceof Buffer){
+    return obj
+  }
+  if(obj instanceof Readable && isObjectStream(obj)){
+    return toNewLineJSON(obj)
+  }
+  // it is an async generator
+  if(obj[Symbol.asyncIterator] !== undefined){
+    return generatorToReadable(obj as unknown as AsyncGenerator<RowObject>)
+  }
+  return obj as Readable
 }
 export class LoaderError extends Error {
   query?: string;

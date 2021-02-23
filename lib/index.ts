@@ -1,5 +1,5 @@
 import RedshiftLoader from './RedshiftLoader';
-import { createDefaults, mergeOptions } from './utils';
+import { mergeOptions } from './utils';
 import { FactoryOptions, RSLoaderOptions, DefaultOptionInputs } from './types';
 export class RedshiftLoaderFactory {
   defaultOptions: FactoryOptions;
