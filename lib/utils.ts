@@ -1,6 +1,6 @@
 import assert from 'assert';
 import {Stream, Readable, Transform} from 'stream'
-import { 
+import {
   S3UploadBody,
   UploadBody, AWSCredentials, CopySettings,
   DefaultOptionInputs, FactoryOptions, RSLoaderOptions,
@@ -17,7 +17,7 @@ export function isObjectStream(obj: Readable | Stream | any): boolean{
   if(!(obj instanceof Stream)){
     return false
   }
-  //@ts-ignore
+  // @ts-ignore
   return typeof obj._read === 'function' && obj.readableObjectMode
 }
 function toJSONLine(obj: RowObject){
@@ -40,7 +40,7 @@ export function generatorToReadable<T extends RowObject = RowObject>(
     objectMode:false,
     async read(){
       (async () => {
-        for await (let row of generator){
+        for await (const row of generator){
           const value = toJSONLine(row)
           if (!this.push(value)){
             await new Promise((resolve) => stream.once("drain", resolve))

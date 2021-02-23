@@ -5,7 +5,7 @@ import { v4 } from 'uuid';
 import AWS from 'aws-sdk';
 import pg from 'pg';
 import { transactionQuery } from './core';
-import { 
+import {
   ensureS3BodyAcceptable,
   mergeOptions, parseRsTables, createCopyCredString,
   LoaderError
