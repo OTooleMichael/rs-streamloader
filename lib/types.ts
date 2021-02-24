@@ -69,7 +69,6 @@ export interface RSLoaderOptions extends Partial<DefaultOptionInputs> {
   table: TableName;
   bodies?: UploadBody[];
   body?: UploadBody;
-  bucket: string;
 }
 export type ReleaseFn = (release?: any) => void;
 export type Rows = Record<string, any>[];
