@@ -33,28 +33,33 @@ export function toNewLineJSON(stream: Readable){
   });
   return stream.pipe(tx)
 }
+
 export function generatorToReadable<T extends RowObject = RowObject>(
   generator: AsyncGenerator<T>,
 ): Readable {
   const stream = new Readable({
-    objectMode:false,
-    async read(){
-      (async () => {
-        for await (const row of generator){
-          const value = toJSONLine(row)
-          if (!this.push(value)){
-            await new Promise((resolve) => stream.once("drain", resolve))
+      objectMode: false,
+      read:async function(){
+          try{
+              while(true){
+                  let result = await generator.next()
+                  if(result.done){
+                    this.push(null)
+                    break
+                  }
+                  const value = toJSONLine(result.value);
+                  if(!this.push(value)){
+                      break
+                  }
+              }
+          }catch(error){
+              this.emit('error', error)
           }
-        }
-        this.push(null)
-      })().catch(e=>{
-        console.log(e,'ERROR')
-        stream.emit('error', e)
-      });
-    }
+      }
   })
   return stream;
 }
+
 export function ensureS3BodyAcceptable(obj: UploadBody): S3UploadBody {
   if(typeof obj === 'string' || obj instanceof Buffer){
     return obj
@@ -62,12 +67,15 @@ export function ensureS3BodyAcceptable(obj: UploadBody): S3UploadBody {
   if(obj instanceof Readable && isObjectStream(obj)){
     return toNewLineJSON(obj)
   }
+  const isAsnycIterator = obj[Symbol.asyncIterator] !== undefined
+  const hasPipeFn = typeof (obj as Readable).pipe === 'function'
   // it is an async generator
-  if(obj[Symbol.asyncIterator] !== undefined){
+  if(isAsnycIterator && !hasPipeFn){
     return generatorToReadable(obj as unknown as AsyncGenerator<RowObject>)
   }
   return obj as Readable
 }
+
 export class LoaderError extends Error {
   query?: string;
   step?: number;

@@ -1,5 +1,5 @@
 import RedshiftLoader from './RedshiftLoader';
-import { mergeOptions } from './utils';
+import { mergeOptions, LoaderError } from './utils';
 import { FactoryOptions, RSLoaderOptions, DefaultOptionInputs } from './types';
 export class RedshiftLoaderFactory {
   defaultOptions: FactoryOptions;
@@ -7,7 +7,9 @@ export class RedshiftLoaderFactory {
     this.defaultOptions = mergeOptions(options) as FactoryOptions;
   }
   createLoader(options: RSLoaderOptions) {
-    return new RedshiftLoader( mergeOptions<RSLoaderOptions>(options, this.defaultOptions) );
+    return new RedshiftLoader(
+      mergeOptions<RSLoaderOptions>(options, this.defaultOptions)
+    );
   }
 }
-export { RedshiftLoader };
+export { RedshiftLoader, LoaderError };

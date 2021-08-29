@@ -1,6 +1,6 @@
 {
   "name": "rs-streamloader",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Redshift Loading Tool (ETL) - receives readable streams and Copies to Redshift (upsert or insert) via S3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
