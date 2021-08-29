@@ -1,10 +1,14 @@
 import assert from 'assert';
-import {Stream, Readable, Transform} from 'stream'
+import { Stream, Readable, Transform } from 'stream';
 import {
   S3UploadBody,
-  UploadBody, AWSCredentials, CopySettings,
-  DefaultOptionInputs, FactoryOptions, RSLoaderOptions,
-  TableName
+  UploadBody,
+  AWSCredentials,
+  CopySettings,
+  DefaultOptionInputs,
+  FactoryOptions,
+  RSLoaderOptions,
+  TableName,
 } from './types';
 interface LoaderErrorDetails {
   query?: string;
@@ -13,67 +17,65 @@ interface LoaderErrorDetails {
   details?: any;
 }
 type RowObject = Record<string, any>;
-export function isObjectStream(obj: Readable | Stream | any): boolean{
-  if(!(obj instanceof Stream)){
-    return false
+export function isObjectStream(obj: Readable | Stream | any): boolean {
+  if (!(obj instanceof Stream)) {
+    return false;
   }
   // @ts-ignore
-  return typeof obj._read === 'function' && obj.readableObjectMode
+  return typeof obj._read === 'function' && obj.readableObjectMode;
 }
-function toJSONLine(obj: RowObject){
-  return Buffer.from(JSON.stringify(obj) + '\n', 'utf-8')
+function toJSONLine(obj: RowObject) {
+  return Buffer.from(JSON.stringify(obj) + '\n', 'utf-8');
 }
-export function toNewLineJSON(stream: Readable){
+export function toNewLineJSON(stream: Readable) {
   const tx = new Transform({
-    writableObjectMode:true,
-    readableObjectMode:false,
+    writableObjectMode: true,
+    readableObjectMode: false,
     transform(obj: RowObject, encoding, callback) {
-      return callback(null, toJSONLine(obj))
-    }
+      return callback(null, toJSONLine(obj));
+    },
   });
-  return stream.pipe(tx)
+  return stream.pipe(tx);
 }
 
-export function generatorToReadable<T extends RowObject = RowObject>(
-  generator: AsyncGenerator<T>,
-): Readable {
+export function generatorToReadable<T extends RowObject = RowObject>(generator: AsyncGenerator<T>): Readable {
   const stream = new Readable({
-      objectMode: false,
-      read:async function(){
-          try{
-              while(true){
-                  let result = await generator.next()
-                  if(result.done){
-                    this.push(null)
-                    break
-                  }
-                  const value = toJSONLine(result.value);
-                  if(!this.push(value)){
-                      break
-                  }
-              }
-          }catch(error){
-              this.emit('error', error)
+    objectMode: false,
+    async read() {
+      try {
+        while (true) {
+          const result = await generator.next();
+          if (result.done) {
+            this.push(null);
+            break;
           }
+          const value = toJSONLine(result.value);
+          if (!this.push(value)) {
+            break;
+          }
+        }
+      } catch (error) {
+        this.emit('error', error);
       }
-  })
+    },
+  });
   return stream;
 }
 
 export function ensureS3BodyAcceptable(obj: UploadBody): S3UploadBody {
-  if(typeof obj === 'string' || obj instanceof Buffer){
-    return obj
+  if (typeof obj === 'string' || obj instanceof Buffer) {
+    return obj;
   }
-  if(obj instanceof Readable && isObjectStream(obj)){
-    return toNewLineJSON(obj)
+  if (obj instanceof Readable && isObjectStream(obj)) {
+    return toNewLineJSON(obj);
   }
-  const isAsnycIterator = obj[Symbol.asyncIterator] !== undefined
-  const hasPipeFn = typeof (obj as Readable).pipe === 'function'
+  const isAsnycIterator = obj[Symbol.asyncIterator] !== undefined;
+  const hasPipeFn = typeof (obj as Readable).pipe === 'function';
   // it is an async generator
-  if(isAsnycIterator && !hasPipeFn){
-    return generatorToReadable(obj as unknown as AsyncGenerator<RowObject>)
+  if (isAsnycIterator && !hasPipeFn) {
+    return generatorToReadable((obj as unknown) as AsyncGenerator<RowObject>);
   }
-  return obj as Readable
+  return obj as Readable;
 }
 
 export class LoaderError extends Error {
@@ -118,21 +120,21 @@ export function mergeOptions<T extends FactoryOptions | RSLoaderOptions = Factor
   options: DefaultOptionInputs,
   defaultOptions: DefaultOptionInputs = {},
 ): T {
-    const copySettings = options.copySettings || {} as Partial<CopySettings>;
-    const defaultCopySettings = defaultOptions.copySettings || {} as Partial<CopySettings>;
-    delete options.copySettings;
-    const output: T = {
+  const copySettings = options.copySettings || ({} as Partial<CopySettings>);
+  const defaultCopySettings = defaultOptions.copySettings || ({} as Partial<CopySettings>);
+  delete options.copySettings;
+  const output: T = {
     ...createDefaults(),
     ...defaultOptions,
-    ...options
-    } as T
+    ...options,
+  } as T;
 
-    output.copySettings = {
-        ...createDefaults().copySettings,
-        ...defaultCopySettings,
-        ...copySettings,
-    } as CopySettings;
-    return output;
+  output.copySettings = {
+    ...createDefaults().copySettings,
+    ...defaultCopySettings,
+    ...copySettings,
+  } as CopySettings;
+  return output;
 }
 export function parseRsTables(tableParams: TableName): { table: string; schema: string } {
   if (typeof tableParams === 'string') {

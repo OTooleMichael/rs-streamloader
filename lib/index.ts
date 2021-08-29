@@ -7,9 +7,7 @@ export class RedshiftLoaderFactory {
     this.defaultOptions = mergeOptions(options) as FactoryOptions;
   }
   createLoader(options: RSLoaderOptions) {
-    return new RedshiftLoader(
-      mergeOptions<RSLoaderOptions>(options, this.defaultOptions)
-    );
+    return new RedshiftLoader(mergeOptions<RSLoaderOptions>(options, this.defaultOptions));
   }
 }
 export { RedshiftLoader, LoaderError };

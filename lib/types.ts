@@ -19,8 +19,8 @@ export type TableName =
       schema: string;
     };
 
-export type S3UploadBody = Readable | string | Buffer
-export type UploadBody = S3UploadBody | AsyncGenerator<Record<string,any>>;
+export type S3UploadBody = Readable | string | Buffer;
+export type UploadBody = S3UploadBody | AsyncGenerator<Record<string, any>>;
 interface CopySettingsBase {
   maxError: number;
   gzip: boolean;
@@ -64,7 +64,9 @@ export interface FactoryOptions {
   copySettings: CopySettings;
   debug?: boolean;
 }
-export type DefaultOptionInputs = Omit<Partial<FactoryOptions>,'copySettings'> & {copySettings?:Partial<CopySettings>};
+export type DefaultOptionInputs = Omit<Partial<FactoryOptions>, 'copySettings'> & {
+  copySettings?: Partial<CopySettings>;
+};
 export interface RSLoaderOptions extends Partial<DefaultOptionInputs> {
   table: TableName;
   bodies?: UploadBody[];
